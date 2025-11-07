@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Babylon Scene</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+var createScene = function () {
+    var scene = new BABYLON.Scene(engine);
+
+    //----CAMERA SETUP-----------------------
+    var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 6, BABYLON.Vector3(0, 0, 0), scene);
+    camera.attachControl(canvas, true);
+    camera.wheelPrecision = 40;
+    camera.setTarget(new BABYLON.Vector3(0, 0.3, 0));
+    camera.panningSensibility = 0;
+    camera.pinchDeltaPercentage = 0.001;
+    camera.fov = 0.3;
+    camera.beta = 1.2;
+    camera.alpha = 2.3;
+    camera.upperBetaLimit = 1.55;
+    camera.upperRadiusLimit = 10;
+    camera.lowerRadiusLimit = 1.7;
+
+    //----RENDERING PIPELINE + BLOOM---------
+    var pipeline = new BABYLON.DefaultRenderingPipeline("defaultPipeline", true, scene, [camera]);
+    pipeline.fxaaEnabled = true;
+    pipeline.samples = 4;
+    pipeline.imageProcessing.contrast = 2.2;
+    pipeline.imageProcessing.exposure = 0.8;
+
+    pipeline.bloomEnabled = true;
+    pipeline.bloomThreshold = 0.3;
+    pipeline.bloomIntensity = 2.0;
+    pipeline.bloomKernel = 128;
+
+    //----HDRI TEXTURE------------------------
+    var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("textures/Studio_Softbox_2Umbrellas_cube_specular.env", scene);
+    hdrTexture.level = 0.8;
+    scene.environmentTexture = hdrTexture;
+
+    //----CINEMATIC LIGHTING------------------
+    var keyLight = new BABYLON.SpotLight("keyLight", new BABYLON.Vector3(2, 2.5, -2), new BABYLON.Vector3(-0.5, -1, 0.5), Math.PI / 4, 20, scene);
+    keyLight.diffuse = new BABYLON.Color3(1, 0.75, 0.5);
+    keyLight.specular = new BABYLON.Color3(1, 0.75, 0.5);
+    keyLight.intensity = 0.9;
+
+    var rimLight = new BABYLON.DirectionalLight("rimLight", new BABYLON.Vector3(0, -0.8, -1), scene);
+    rimLight.position = new BABYLON.Vector3(0, 3, 4);
+    rimLight.diffuse = new BABYLON.Color3(0.3, 0.5, 1);
+    rimLight.specular = new BABYLON.Color3(0.8, 0.9, 1);
+    rimLight.intensity = 3.5;
+
+    var fillLight = new BABYLON.DirectionalLight("fillLight", new BABYLON.Vector3(-1, -0.5, 0.5), scene);
+    fillLight.diffuse = new BABYLON.Color3(0.4, 0.5, 0.8);
+    fillLight.specular = new BABYLON.Color3(0.4, 0.5, 0.8);
+    fillLight.intensity = 0.3;
+
+    //----GLOW LAYER FOR EDGE BLOOM----------
+    const glowLayer = new BABYLON.GlowLayer("glow", scene);
+    glowLayer.intensity = 0.4;
+    glowLayer.blurKernelSize = 64;
+    glowLayer.glowColor = new BABYLON.Color3(0.4, 0.6, 1);
+
+    //----PRODUCT MESH------------------------
+    var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/s/ik9xxhdkio6g8qu/B07QPQCQKQ.glb", "my-file.glb", scene, function (mesh) {
+        const meshConstant = scene.getMeshByName("__root__");
+        meshConstant.position.y = 0.01;
+
+        const couchMat = new BABYLON.StandardMaterial("couchMat", scene);
+        couchMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+        couchMat.emissiveColor = new BABYLON.Color3(0.4, 0.6, 1);
+        meshConstant.material = couchMat;
+
+        glowLayer.addIncludedOnlyMesh(meshConstant);
+    });
+
+    //----TRANSPARENT BACKGROUND & GROUND-----
+    scene.clearColor = new BABYLON.Color4(0, 0, 0, 0); // fully transparent background
+
+    const groundPlane = BABYLON.MeshBuilder.CreateGround("ground", { height: 100, width: 100 }, scene);
+    groundPlane.position.y = -0.01;
+    groundPlane.isPickable = false;
+    groundPlane.isVisible = false; // fully transparent, no shadows
+
+    return scene;
+};
+export default createScene;
+
+
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+  </script>
+</body>
+</html>
