@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Babylon Scene</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+
+var createScene = function () {
+    var scene = new BABYLON.Scene(engine);
+    
+//----CAMERA SETUP-----------------------
+    
+    var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2,  Math.PI / 2, 6, BABYLON.Vector3(0,0,0), scene);
+    camera.attachControl(canvas, true); //Allows for camera movement
+    camera.wheelPrecision = 40; //Mouse drag orbit speed
+    camera.setTarget(new BABYLON.Vector3(0, 0.3, 0)); //Locks camera to ~middle of chair
+    camera.panningSensibility = 0; //Disables panning via double click / RMB
+    camera.pinchDeltaPercentage=0.001; //Dampens swipe orbit on mobile
+    camera.fov = .3; //Field of View
+    camera.beta = 1.2; //Starting vertical angle of camera
+    camera.alpha = 2.3; //starting horizontal angle of camera
+    camera.upperBetaLimit = 1.55;  //Doesn't let camera go below ~horizon
+    camera.upperRadiusLimit = 7;  //camera max distance
+    camera.lowerRadiusLimit = 1.7;  //camera min distance
+
+
+    const groundPlane = BABYLON.MeshBuilder.CreateGround("ground", {height: 100, width: 100, subdivisions: 4});
+    groundPlane.position.y = -0.01
+
+    var pipeline = new BABYLON.DefaultRenderingPipeline(
+    "defaultPipeline", // The name of the pipeline
+    true, // Do you want the pipeline to use HDR texture?
+    scene, // The scene instance
+    [camera] // The list of cameras to be attached to
+);
+    pipeline.fxaaEnabled = true;
+    pipeline.samples = 4;
+
+//----HDRI TEXTURE------------------------
+
+    var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("textures/Studio_Softbox_2Umbrellas_cube_specular.env", scene);
+    scene.environmentTexture = hdrTexture;
+
+
+//----DIR LIGHTS--------------------------
+
+    var lightShadowBlur = new BABYLON.SpotLight("*spot00", new BABYLON.Vector3(0, 20, 0), new BABYLON.Vector3(0, -1, 0), 1.2, 24, scene);
+    lightShadowBlur.shadowMinZ = 18;
+    lightShadowBlur.shadowMaxZ = 30; 
+    lightShadowBlur.excludedMeshes.push(groundPlane);
+    
+    /*
+    //Light for general blur shadow (not used anymore)
+    var lightShadowCaster = new BABYLON.DirectionalLight('shadowLight', new BABYLON.Vector3(0.5, 1, 0), scene)
+    lightShadowCaster.intensity = 0.5
+    */
+
+    //Create light 1
+    var light1 = new BABYLON.DirectionalLight("DirectionalLight", new BABYLON.Vector3(0.3, -1, -0.15), scene);
+    light1.diffuse = new BABYLON.Color3(1, 0.878, 0.709);
+    light1.intensity = 1;
+    light1.specular = new BABYLON.Color3(1, 0.878, 0.709);
+    light1.excludedMeshes.push(groundPlane);
+    
+    //Create light 2
+    var light2 = new BABYLON.DirectionalLight("DirectionalLight", new BABYLON.Vector3(0, -1, 0), scene);
+    light2.diffuse = new BABYLON.Color3(0.78, 0.8, 1);
+    light2.intensity = 0.96;
+    light2.specular = new BABYLON.Color3(0.78, 0.8, 1);
+    light2.excludedMeshes.push(groundPlane);
+    
+    //Create light 3
+    var light3 = new BABYLON.DirectionalLight("DirectionalLight", new BABYLON.Vector3(-0.5, 1, -0.5), scene);
+    light3.diffuse = new BABYLON.Color3(0.423, 0.733, 1);
+    light3.intensity = 0.12;
+    light3.specular = new BABYLON.Color3(0.423, 0.733, 1);
+    light3.excludedMeshes.push(groundPlane);
+    
+//----SHADOW CASTING & SETUP---------------
+
+    //contact hardening shadow generator
+    var contactShadowGenerator = new BABYLON.ShadowGenerator(256, lightShadowBlur);
+    contactShadowGenerator.useContactHardeningShadow = true;
+    contactShadowGenerator.contactHardeningLightSizeUVRatio = 0.05;
+    contactShadowGenerator.setDarkness(.7);
+    //contactShadowGenerator.filteringQuality = BABYLON.ShadowGenerator.QUALITY_HIGH;
+
+    //normal blur shadow generator (not used anymore)
+    /*
+    shadowGenerator = new BABYLON.ShadowGenerator(1024, lightShadowCaster);
+    shadowGenerator.useBlurExponentialShadowMap = true;
+    shadowGenerator.useKernelBlur = true;
+    shadowGenerator.blurKernel = 100;  
+    shadowGenerator.setDarkness(.92);
+    */
+
+//----SSAO2-------------------------------
+
+    const SSAO2 = new BABYLON.SSAO2RenderingPipeline("ssao2", scene, 1, [camera]);
+    SSAO2.samples = 32;
+    SSAO2.minZAspect = 0.05;
+    SSAO2.radius = 0.2;
+    SSAO2.totalStrength = .8;
+
+//----CHAIR--------------------------------
+
+        var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/s/ik9xxhdkio6g8qu/B07QPQCQKQ.glb", "my-file.glb", scene, function (mesh) {
+        //shadowGenerator.addShadowCaster(mesh[1], true);
+        contactShadowGenerator.addShadowCaster(mesh[1], true);
+        const meshConstant = scene.getMeshByName("__root__");
+        meshConstant.receiveShadows = true;
+        
+        //meshConstant.position = new BABYLON.Vector3(0, 0.2, 0);
+        //meshConstant.rotation = new BABYLON.Vector3(0, 0.55, 0);
+    });
+
+//----BACKGROUND & GROUND SETUP------------
+
+    scene.clearColor = new BABYLON.Color3(0.9, 0.9, 0.9);
+
+    //This ground is transparent and only catches the spotlight shadow.
+    var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene)
+    ground.rotation.x = Math.PI / 2
+    ground.material = new BABYLON.ShadowOnlyMaterial('mat', scene)
+    ground.material.activeLight = lightShadowBlur
+    ground.receiveShadows = true
+
+    //This ground is emissive grey to match the background and only catches SSAO.
+    var myMaterial = new BABYLON.StandardMaterial("myMaterial", scene);
+    myMaterial.emissiveColor = new BABYLON.Color3(.952, 0.952, 0.952);
+    groundPlane.material = myMaterial;
+
+    return scene;
+
+};
+export default createScene
+
+
+
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+  </script>
+</body>
+</html>
