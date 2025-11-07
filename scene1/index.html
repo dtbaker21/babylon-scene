@@ -27,9 +27,19 @@ const createScene = function () {
     var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
     light.intensity = 0.7;
 
-    var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 2, segments: 32 }, scene);
-    sphere.position.y = 1;
+    //var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 2, segments: 32 }, scene);
+    //sphere.position.y = 1;
 
+        var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/s/ik9xxhdkio6g8qu/B07QPQCQKQ.glb", "my-file.glb", scene, function (mesh) {
+        //shadowGenerator.addShadowCaster(mesh[1], true);
+        contactShadowGenerator.addShadowCaster(mesh[1], true);
+        const meshConstant = scene.getMeshByName("__root__");
+        meshConstant.receiveShadows = true;
+        
+        //meshConstant.position = new BABYLON.Vector3(0, 0.2, 0);
+        //meshConstant.rotation = new BABYLON.Vector3(0, 0.55, 0);
+    });
+  
     var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 6, height: 6 }, scene);
 
     // Define camera path
