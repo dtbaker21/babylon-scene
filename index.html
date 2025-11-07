@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Babylon Scene</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+  </style>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById("renderCanvas");
+    const engine = new BABYLON.Engine(canvas, true);
+
+const createScene = function () {
+    var scene = new BABYLON.Scene(engine);
+
+    var camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0, 5, -10), scene);
+    camera.setTarget(BABYLON.Vector3.Zero());
+    camera.attachControl(canvas, true);
+
+    var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+    light.intensity = 0.7;
+
+    var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", { diameter: 2, segments: 32 }, scene);
+    sphere.position.y = 1;
+
+    var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 6, height: 6 }, scene);
+
+    // Define camera path
+    var path = [
+        new BABYLON.Vector3(0, 5, -10),
+        new BABYLON.Vector3(2, 5, -5),
+        new BABYLON.Vector3(4, 5, 0),
+        new BABYLON.Vector3(2, 5, 5),
+        new BABYLON.Vector3(0, 5, 10)
+    ];
+
+    // Create animation keys
+    var keys = [];
+    for (let i = 0; i < path.length; i++) {
+        keys.push({
+            frame: i * 30, // 30 frames between each point
+            value: path[i]
+        });
+    }
+
+    // Create the animation
+    var cameraAnimation = new BABYLON.Animation(
+        "cameraMove",
+        "position",
+        60, // frame rate
+        BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+        BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    cameraAnimation.setKeys(keys);
+
+    // Start animation when scene is ready
+    scene.onReadyObservable.add(() => {
+        camera.animations = [cameraAnimation];
+        scene.beginAnimation(camera, 0, keys[keys.length - 1].frame, false);
+    });
+
+    // Optional: keep camera target fixed
+    scene.onBeforeRenderObservable.add(() => {
+        camera.setTarget(BABYLON.Vector3.Zero());
+    });
+
+    return scene;
+};
+
+
+
+    const scene = createScene();
+    engine.runRenderLoop(() => scene.render());
+    window.addEventListener("resize", () => engine.resize());
+  </script>
+</body>
+</html>
