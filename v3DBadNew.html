@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Chair Viewer</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        
+        var createScene = function () {
+            var scene = new BABYLON.Scene(engine);
+            
+            // Disable hardware scaling for worse aliasing
+            engine.setHardwareScalingLevel(1);
+            
+        //----CAMERA SETUP-----------------------
+            
+            // CAMERA VARIABLES - Easy adjustments
+            var cameraDistance = 4.5;  // How far camera is from product (lower = closer)
+            var cameraTargetHeight = 0.5;  // Height camera looks at (lower = product appears lower in frame)
+            
+            var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2,  Math.PI / 2, cameraDistance, BABYLON.Vector3(0,0,0), scene);
+            camera.attachControl(canvas, true);
+            camera.wheelPrecision = 40;
+            camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
+            camera.panningSensibility = 0;
+            camera.pinchDeltaPercentage = 0.01;  // Increased from 0.001 for snappier pinch-to-zoom
+            camera.fov = .3;
+            camera.beta = 1.38;
+            camera.alpha = -2;
+            camera.upperRadiusLimit = 7;
+            camera.lowerRadiusLimit = 1.7;
+
+        //----HDRI TEXTURE------------------------
+
+            var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("https://assets.babylonjs.com/environments/studio.env", scene);
+            scene.environmentTexture = hdrTexture;
+            scene.environmentIntensity = 1.2;
+
+        //----CHAIR--------------------------------
+
+            // SCALE VARIABLE - adjust this to make model bigger/smaller
+            var modelScale = 0.01;
+
+            var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/scl/fi/5mpforjje4go75nufbtqn/NEW-BAD-CHAIR-2.glb?rlkey=he8ic20k54ajoqq1isenbxpgi&st=m2nwrmbs", "my-file.glb", scene, function (mesh) {
+                const meshConstant = scene.getMeshByName("__root__");
+                
+
+                // Apply scale
+                meshConstant.scaling = new BABYLON.Vector3(modelScale, modelScale, modelScale);
+                
+                // Hide the floor plane that came with the model
+                const floorPlane = scene.getMeshByName("Plane001_FLOOR_0");
+                if (floorPlane) {
+                    floorPlane.isVisible = false;
+                }
+                
+                // Degrade texture quality - disable filtering and reduce sampling
+                scene.materials.forEach((material) => {
+                    if (material.getActiveTextures) {
+                        material.getActiveTextures().forEach((texture) => {
+                            texture.updateSamplingMode(BABYLON.Texture.NEAREST_SAMPLINGMODE); // Point sampling, no filtering
+                            texture.anisotropicFilteringLevel = 1; // Minimum anisotropic filtering
+                        });
+                    }
+                });
+                
+                // DEBUG: Log all meshes in the scene
+                console.log("=== ALL MESHES IN SCENE ===");
+                scene.meshes.forEach((m, index) => {
+                    console.log(`${index}: ${m.name} - isVisible: ${m.isVisible}, receiveShadows: ${m.receiveShadows}`);
+                });
+                console.log("=========================");
+            });
+
+        //----BACKGROUND SETUP--------------------
+
+            // Transparent background
+            scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+
+            // Invisible ground (no shadow reception)
+            var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
+            ground.rotation.x = Math.PI / 2;
+            ground.isVisible = false;
+
+            return scene;
+
+        };
+        
+        const scene = createScene();
+        
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+        
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+        
+        // Prevent page scroll when mouse wheel over canvas
+        canvas.addEventListener('wheel', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Prevent page zoom/scroll when pinch-to-zoom on trackpad
+        canvas.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gesturechange', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gestureend', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Prevent touchpad pinch zoom (two-finger scroll that triggers zoom)
+        canvas.addEventListener('touchmove', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
