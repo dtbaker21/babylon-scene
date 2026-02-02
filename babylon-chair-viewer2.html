@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Chair Viewer</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+        }
+        #renderCanvas:active {
+            cursor: grabbing;
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        
+        var createScene = function () {
+            var scene = new BABYLON.Scene(engine);
+            
+            // Enable anti-aliasing
+            engine.setHardwareScalingLevel(1);
+
+        //----LIGHT ORBS VISIBILITY---------------
+
+            var showLightOrbs = false; // Set to true to show colored spheres at light positions
+
+        //----BACKGROUND COLOR--------------------
+
+            var backgroundColor = "#E8E7E7"; // Hex color for background and ground plane
+
+        //----EXR ROTATION------------------------
+
+            var exrRotationDegrees = 210; // Rotate the environment left/right (in degrees)
+
+        //----MODEL POSITION----------------------
+
+            var modelVerticalOffset = 0; // Adjust this to move model up (positive) or down (negative)
+
+        //----GROUND PLANE HEIGHTS----------------
+
+            var emissiveGroundHeight = 0; // Height of the emissive ground plane (catches SSAO)
+            var shadowOnlyGroundHeight = 0.001; // Height of shadow-only plane (catches spotlight shadow)
+            var blurredShadowPlaneHeight = 0.002; // Height of blurred rectangle shadow plane
+
+        //----POINT LIGHTS SETUP------------------
+
+            var pointLight1Intensity = 4; // Left/front light intensity
+            var pointLight2Intensity = 7; // Right/back light intensity
+            var pointLight3Intensity = 50; // Back light intensity
+
+        //----CAMERA SETUP-----------------------
+            
+            // CAMERA VARIABLES - Easy adjustments
+            var cameraDistance = 5.5;  // How far camera is from product (lower = closer)
+            var cameraTargetHeight = 0.4;  // Height camera looks at (lower = product appears lower in frame)
+            
+            var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2,  Math.PI / 2, cameraDistance, BABYLON.Vector3(0,0,0), scene);
+            camera.attachControl(canvas, true);
+            camera.wheelPrecision = 40;
+            camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
+            camera.panningSensibility = 0;
+            camera.pinchDeltaPercentage=0.001;
+            camera.fov = .3;
+            camera.beta = 1.33;
+            camera.alpha = -2;
+            camera.upperRadiusLimit = 30;
+            camera.lowerRadiusLimit = 1.7;
+
+        //----SHADOW VARIABLES--------------------
+
+            var shadowSize = 2; // Size of shadow plane (adjust this to make shadow bigger/smaller)
+            var shadowDarkness = 0.25; // Maximum darkness of shadow (0 = transparent, 1 = black)
+            var shadowBlurAmount = 120; // Blur radius in pixels
+
+        //----HDRI TEXTURE (EXR)------------------
+
+            console.log("=== LOADING EXR ENVIRONMENT ===");
+            
+            // Load EXR as environment texture using EXRCubeTexture
+            const hdrTexture = new BABYLON.EXRCubeTexture(
+                "https://dl.dropbox.com/scl/fi/nsreuijac4dxclti13q5g/brown_photostudio_02_512.exr?rlkey=8x05nmzqyexnjro5hs0r7dyqr&st=evqale1r",
+                scene,
+                512,     // size
+                false,   // noMipmap
+                true,    // generateHarmonics
+                false,   // gammaSpace
+                true     // prefiltered
+            );
+            
+            // Convert degrees to radians and apply rotation
+            hdrTexture.rotationY = exrRotationDegrees * (Math.PI / 180);
+            
+            scene.environmentTexture = hdrTexture;
+            scene.environmentIntensity = 1;
+            
+            console.log("EXR environment texture loaded with rotation:", exrRotationDegrees, "degrees");
+
+        //----GROUND PLANE------------------------
+
+            const groundPlane = BABYLON.MeshBuilder.CreateGround("ground", {height: 100, width: 100, subdivisions: 4});
+            groundPlane.position.y = emissiveGroundHeight;
+
+        //----POINT LIGHTS------------------------
+
+            // Point light 1 - Left and slightly in front
+            var pointLight1 = new BABYLON.PointLight("pointLight1", new BABYLON.Vector3(-2, 0, 1), scene);
+            pointLight1.intensity = pointLight1Intensity;
+            pointLight1.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight1.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight1.excludedMeshes.push(groundPlane); // Don't light the ground
+            
+            // Sphere to visualize point light 1
+            var sphere1 = BABYLON.MeshBuilder.CreateSphere("sphere1", {diameter: 0.2}, scene);
+            sphere1.position = pointLight1.position;
+            sphere1.isVisible = showLightOrbs; // Control visibility with flag
+            var sphere1Mat = new BABYLON.StandardMaterial("sphere1Mat", scene);
+            sphere1Mat.emissiveColor = new BABYLON.Color3(1, 1, 0); // Yellow
+            sphere1Mat.disableLighting = true;
+            sphere1.material = sphere1Mat;
+            
+            // Point light 2 - Right and slightly behind
+            var pointLight2 = new BABYLON.PointLight("pointLight2", new BABYLON.Vector3(1.5, 0.8, -1), scene);
+            pointLight2.intensity = pointLight2Intensity;
+            pointLight2.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight2.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight2.excludedMeshes.push(groundPlane); // Don't light the ground
+            
+            // Sphere to visualize point light 2
+            var sphere2 = BABYLON.MeshBuilder.CreateSphere("sphere2", {diameter: 0.2}, scene);
+            sphere2.position = pointLight2.position;
+            sphere2.isVisible = showLightOrbs; // Control visibility with flag
+            var sphere2Mat = new BABYLON.StandardMaterial("sphere2Mat", scene);
+            sphere2Mat.emissiveColor = new BABYLON.Color3(0, 1, 1); // Cyan
+            sphere2Mat.disableLighting = true;
+            sphere2.material = sphere2Mat;
+            
+            // Point light 3 - Directly behind
+            var pointLight3 = new BABYLON.PointLight("pointLight3", new BABYLON.Vector3(0, 0, 4), scene);
+            pointLight3.intensity = pointLight3Intensity;
+            pointLight3.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight3.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight3.excludedMeshes.push(groundPlane); // Don't light the ground
+            
+            // Sphere to visualize point light 3
+            var sphere3 = BABYLON.MeshBuilder.CreateSphere("sphere3", {diameter: 0.2}, scene);
+            sphere3.position = pointLight3.position;
+            sphere3.isVisible = showLightOrbs; // Control visibility with flag
+            var sphere3Mat = new BABYLON.StandardMaterial("sphere3Mat", scene);
+            sphere3Mat.emissiveColor = new BABYLON.Color3(1, 0, 1); // Magenta
+            sphere3Mat.disableLighting = true;
+            sphere3.material = sphere3Mat;
+
+        //----ANTI-ALIASING PIPELINE--------------
+
+            var pipeline = new BABYLON.DefaultRenderingPipeline(
+                "defaultPipeline",
+                true, // HDR
+                scene,
+                [camera]
+            );
+            pipeline.fxaaEnabled = true; // Fast Approximate Anti-Aliasing
+            pipeline.samples = 4; // MSAA samples (4x anti-aliasing)
+
+        //----SHADOW LIGHT------------------------
+
+            var lightShadowBlur = new BABYLON.SpotLight("spot00", new BABYLON.Vector3(0, 20, 0), new BABYLON.Vector3(0, -1, 0), 1.2, 24, scene);
+            lightShadowBlur.shadowMinZ = 0;
+            lightShadowBlur.shadowMaxZ = 20; 
+            lightShadowBlur.excludedMeshes.push(groundPlane);
+            
+            // Contact hardening shadow generator
+            var contactShadowGenerator = new BABYLON.ShadowGenerator(256, lightShadowBlur);
+            contactShadowGenerator.useContactHardeningShadow = true;
+            contactShadowGenerator.contactHardeningLightSizeUVRatio = 0.05;
+            contactShadowGenerator.setDarkness(0.7);
+
+        //----SSAO2-------------------------------
+
+            const SSAO2 = new BABYLON.SSAO2RenderingPipeline("ssao2", scene, 1, [camera]);
+            SSAO2.samples = 32;
+            SSAO2.minZAspect = 0.05;
+            SSAO2.radius = 0.2;
+            SSAO2.totalStrength = .6;
+
+        //----CHAIR--------------------------------
+
+            console.log("=== STARTING MODEL LOAD ===");
+
+            // SCALE VARIABLE - adjust this to make model bigger/smaller
+            var modelScale = 0.01;
+
+            var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/scl/fi/flj3eqc5ph9k5uui7jf2v/alarice_accent_chair_charm_cigar_leather-3-compressed.glb?rlkey=oq0gwm2lgdimwo48b7gk5eqpe&st=iud0lb8i", "my-file.glb", scene, function (mesh) {
+                console.log("✅ MODEL LOADED");
+                
+                const meshConstant = scene.getMeshByName("__root__");
+                
+                if (!meshConstant) {
+                    console.error("❌ ERROR: Could not find __root__ mesh");
+                    return;
+                }
+                
+                // Apply scale
+                meshConstant.scaling = new BABYLON.Vector3(modelScale, modelScale, modelScale);
+                
+                // Apply vertical offset
+                meshConstant.position.y = modelVerticalOffset;
+                
+                meshConstant.receiveShadows = true;
+                
+                // Add to shadow caster
+                if (mesh[1]) {
+                    contactShadowGenerator.addShadowCaster(mesh[1], true);
+                }
+                
+                // Hide the floor plane that came with the model
+                const floorPlane = scene.getMeshByName("Plane001_FLOOR_0");
+                if (floorPlane) {
+                    floorPlane.isVisible = false;
+                }
+                
+                // RESTORE texture quality - enable filtering
+                scene.materials.forEach((material) => {
+                    if (material.getActiveTextures) {
+                        material.getActiveTextures().forEach((texture) => {
+                            texture.updateSamplingMode(BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+                            texture.anisotropicFilteringLevel = 16;
+                        });
+                    }
+                });
+                
+                console.log("✅ Model setup complete");
+            });
+
+        //----BACKGROUND SETUP--------------------
+
+            // Convert hex to Color3
+            function hexToColor3(hex) {
+                var r = parseInt(hex.slice(1, 3), 16) / 255;
+                var g = parseInt(hex.slice(3, 5), 16) / 255;
+                var b = parseInt(hex.slice(5, 7), 16) / 255;
+                return new BABYLON.Color3(r, g, b);
+            }
+
+            // Apply background color (convert to linear space to match emissive ground)
+            var bgColor = hexToColor3(backgroundColor);
+            scene.clearColor = new BABYLON.Color4(bgColor.r, bgColor.g, bgColor.b, 1.0).toLinearSpace();
+
+            // Shadow-only ground (catches spotlight shadow)
+            var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
+            ground.rotation.x = Math.PI / 2;
+            ground.position.y = shadowOnlyGroundHeight;
+            ground.material = new BABYLON.ShadowOnlyMaterial('mat', scene);
+            ground.material.activeLight = lightShadowBlur;
+            ground.receiveShadows = true;
+            
+            // Exclude point lights from shadow-only ground
+            pointLight1.excludedMeshes.push(ground);
+            pointLight2.excludedMeshes.push(ground);
+            pointLight3.excludedMeshes.push(ground);
+
+            // Emissive ground plane (catches SSAO, matches background)
+            var myMaterial = new BABYLON.StandardMaterial("myMaterial", scene);
+            myMaterial.emissiveColor = hexToColor3(backgroundColor);
+            groundPlane.material = myMaterial;
+
+        //----BAKED AO SHADOW PLANE---------------
+
+            // Create shadow plane (blurred rectangle)
+            var shadowPlane = BABYLON.MeshBuilder.CreatePlane('shadowPlane', {width: shadowSize, height: shadowSize}, scene);
+            shadowPlane.rotation.x = Math.PI / 2;
+            shadowPlane.position.y = blurredShadowPlaneHeight;
+            
+            // Exclude point lights from shadow plane
+            pointLight1.excludedMeshes.push(shadowPlane);
+            pointLight2.excludedMeshes.push(shadowPlane);
+            pointLight3.excludedMeshes.push(shadowPlane);
+            
+            // Create dynamic texture for baked AO shadow
+            var shadowTexture = new BABYLON.DynamicTexture("shadowTexture", 2048, scene, true);
+            var ctx = shadowTexture.getContext();
+            
+            var size = 2048;
+            var centerX = size / 2;
+            var centerY = size / 2;
+            var squareSize = size * 0.4;
+            
+            // Draw a solid square first
+            ctx.fillStyle = 'rgba(0, 0, 0, ' + shadowDarkness + ')';
+            ctx.fillRect(
+                centerX - squareSize / 2,
+                centerY - squareSize / 2,
+                squareSize,
+                squareSize
+            );
+            
+            // Apply canvas blur filter
+            ctx.filter = 'blur(' + shadowBlurAmount + 'px)';
+            
+            // Redraw to apply the blur
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            var tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            ctx.clearRect(0, 0, size, size);
+            ctx.filter = 'blur(' + shadowBlurAmount + 'px)';
+            ctx.drawImage(tempCanvas, 0, 0);
+            
+            shadowTexture.update();
+            
+            // Material with alpha blending
+            var shadowMaterial = new BABYLON.StandardMaterial("shadowMat", scene);
+            shadowMaterial.diffuseTexture = shadowTexture;
+            shadowMaterial.diffuseTexture.hasAlpha = true;
+            shadowMaterial.useAlphaFromDiffuseTexture = true;
+            shadowMaterial.backFaceCulling = true; // Only visible from above
+            shadowMaterial.disableLighting = true;
+            shadowMaterial.emissiveColor = new BABYLON.Color3(0, 0, 0);
+            shadowPlane.material = shadowMaterial;
+
+            return scene;
+
+        };
+        
+        const scene = createScene();
+        
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+        
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+        
+        // Prevent page scroll when mouse wheel over canvas
+        canvas.addEventListener('wheel', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Prevent page zoom/scroll when pinch-to-zoom on trackpad
+        canvas.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gesturechange', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gestureend', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Prevent touchpad pinch zoom (two-finger scroll that triggers zoom)
+        canvas.addEventListener('touchmove', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
