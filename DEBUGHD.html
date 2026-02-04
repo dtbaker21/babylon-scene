@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chair Viewer</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            outline: none !important;
+            border: none !important;
+        }
+        
+        * {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        *:focus {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+            outline: none !important;
+            border: none !important;
+            display: block;
+        }
+        
+        #renderCanvas:active {
+            cursor: grabbing;
+        }
+        
+        #renderCanvas:focus {
+            outline: none !important;
+            border: none !important;
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("renderCanvas");
+        
+        // FIXED: Mobile-friendly engine settings with antialiasing
+        const engine = new BABYLON.Engine(canvas, true, {
+            disableWebGL2Support: true,
+            powerPreference: "low-power",
+            preserveDrawingBuffer: false,
+            stencil: false
+        });
+        
+        var createScene = function () {
+            var scene = new BABYLON.Scene(engine);
+            
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            engine.setHardwareScalingLevel(1);
+
+            //----LIGHT ORBS VISIBILITY---------------
+            var showLightOrbs = false;
+
+            //----BACKGROUND COLOR--------------------
+            var backgroundColor = "#E8E7E7";
+
+            //----EXR ROTATION------------------------
+            var exrRotationDegrees = 210;
+
+            //----MODEL POSITION----------------------
+            var modelVerticalOffset = 0;
+
+            //----GROUND PLANE HEIGHTS----------------
+            var emissiveGroundHeight = 0;
+            var shadowOnlyGroundHeight = 0.001;
+            var blurredShadowPlaneHeight = 0.002;
+
+            //----POINT LIGHTS SETUP------------------
+            var pointLight1Intensity = 4;
+            var pointLight2Intensity = 7;
+            var pointLight3Intensity = 50;
+
+            //----CAMERA SETUP (NO ANIMATION)--------
+            var cameraDistance = 4.5;
+            var cameraTargetHeight = 0.35;
+            var finalAlpha = -2;
+            var finalBeta = 1.33;
+            
+            // Camera starts at final position (no animation)
+            var camera = new BABYLON.ArcRotateCamera("Camera", finalAlpha, finalBeta, cameraDistance, new BABYLON.Vector3(0,0,0), scene);
+            camera.attachControl(canvas, true);
+            camera.wheelPrecision = 40;
+            camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
+            camera.panningSensibility = 0;
+            camera.pinchDeltaPercentage = 0.001;
+            camera.fov = .3;
+            camera.upperRadiusLimit = 30;
+            camera.lowerRadiusLimit = 1.7;
+            camera.inputs.attached.pointers.buttons = [0, 1, 2];
+
+            //----SHADOW VARIABLES--------------------
+            var shadowSize = 2;
+            var shadowDarkness = 0.25;
+            var shadowBlurAmount = 120;
+
+            //----HDRI TEXTURE (EXR)------------------
+            const hdrTexture = new BABYLON.EXRCubeTexture(
+                "https://dl.dropbox.com/scl/fi/nsreuijac4dxclti13q5g/brown_photostudio_02_512.exr?rlkey=8x05nmzqyexnjro5hs0r7dyqr&st=evqale1r",
+                scene,
+                512,
+                false,
+                true,
+                false,
+                true
+            );
+            
+            hdrTexture.rotationY = exrRotationDegrees * (Math.PI / 180);
+            scene.environmentTexture = hdrTexture;
+            scene.environmentIntensity = 1;
+
+            //----GROUND PLANE------------------------
+            const groundPlane = BABYLON.MeshBuilder.CreateGround("ground", {height: 100, width: 100, subdivisions: 4});
+            groundPlane.position.y = emissiveGroundHeight;
+
+            //----POINT LIGHTS------------------------
+            var pointLight1 = new BABYLON.PointLight("pointLight1", new BABYLON.Vector3(-2, 0, 1), scene);
+            pointLight1.intensity = pointLight1Intensity;
+            pointLight1.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight1.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight1.excludedMeshes.push(groundPlane);
+            
+            var sphere1 = BABYLON.MeshBuilder.CreateSphere("sphere1", {diameter: 0.2}, scene);
+            sphere1.position = pointLight1.position;
+            sphere1.isVisible = showLightOrbs;
+            var sphere1Mat = new BABYLON.StandardMaterial("sphere1Mat", scene);
+            sphere1Mat.emissiveColor = new BABYLON.Color3(1, 1, 0);
+            sphere1Mat.disableLighting = true;
+            sphere1.material = sphere1Mat;
+            
+            var pointLight2 = new BABYLON.PointLight("pointLight2", new BABYLON.Vector3(1.5, 0.8, -1), scene);
+            pointLight2.intensity = pointLight2Intensity;
+            pointLight2.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight2.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight2.excludedMeshes.push(groundPlane);
+            
+            var sphere2 = BABYLON.MeshBuilder.CreateSphere("sphere2", {diameter: 0.2}, scene);
+            sphere2.position = pointLight2.position;
+            sphere2.isVisible = showLightOrbs;
+            var sphere2Mat = new BABYLON.StandardMaterial("sphere2Mat", scene);
+            sphere2Mat.emissiveColor = new BABYLON.Color3(0, 1, 1);
+            sphere2Mat.disableLighting = true;
+            sphere2.material = sphere2Mat;
+            
+            var pointLight3 = new BABYLON.PointLight("pointLight3", new BABYLON.Vector3(0, 0, 4), scene);
+            pointLight3.intensity = pointLight3Intensity;
+            pointLight3.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight3.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight3.excludedMeshes.push(groundPlane);
+            
+            var sphere3 = BABYLON.MeshBuilder.CreateSphere("sphere3", {diameter: 0.2}, scene);
+            sphere3.position = pointLight3.position;
+            sphere3.isVisible = showLightOrbs;
+            var sphere3Mat = new BABYLON.StandardMaterial("sphere3Mat", scene);
+            sphere3Mat.emissiveColor = new BABYLON.Color3(1, 0, 1);
+            sphere3Mat.disableLighting = true;
+            sphere3.material = sphere3Mat;
+
+            //----ANTI-ALIASING PIPELINE--------------
+            var pipeline = new BABYLON.DefaultRenderingPipeline(
+                "defaultPipeline",
+                true,
+                scene,
+                [camera]
+            );
+            pipeline.fxaaEnabled = true;
+            pipeline.samples = isMobile ? 2 : 4;
+
+            //----SHADOW LIGHT------------------------
+            var lightShadowBlur = new BABYLON.SpotLight("spot00", new BABYLON.Vector3(0, 20, 0), new BABYLON.Vector3(0, -1, 0), 1.2, 24, scene);
+            lightShadowBlur.shadowMinZ = 0;
+            lightShadowBlur.shadowMaxZ = 20;
+            lightShadowBlur.excludedMeshes.push(groundPlane);
+            
+            var contactShadowGenerator = new BABYLON.ShadowGenerator(isMobile ? 128 : 256, lightShadowBlur);
+            contactShadowGenerator.useContactHardeningShadow = true;
+            contactShadowGenerator.contactHardeningLightSizeUVRatio = 0.05;
+            contactShadowGenerator.setDarkness(0.7);
+
+            //----SSAO2-------------------------------
+            const SSAO2 = new BABYLON.SSAO2RenderingPipeline("ssao2", scene, 1, [camera]);
+            SSAO2.samples = isMobile ? 16 : 32;
+            SSAO2.minZAspect = 0.05;
+            SSAO2.radius = 0.2;
+            SSAO2.totalStrength = .6;
+
+            //----CHAIR--------------------------------
+            var modelScale = 0.01;
+
+            var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/scl/fi/flj3eqc5ph9k5uui7jf2v/alarice_accent_chair_charm_cigar_leather-3-compressed.glb?rlkey=oq0gwm2lgdimwo48b7gk5eqpe&st=iud0lb8i", "my-file.glb", scene, function (mesh) {
+                const meshConstant = scene.getMeshByName("__root__");
+                
+                if (!meshConstant) {
+                    console.error('Could not find __root__ mesh');
+                    return;
+                }
+                
+                meshConstant.scaling = new BABYLON.Vector3(modelScale, modelScale, modelScale);
+                meshConstant.position.y = modelVerticalOffset;
+                meshConstant.receiveShadows = true;
+                
+                if (mesh[1]) {
+                    contactShadowGenerator.addShadowCaster(mesh[1], true);
+                }
+                
+                const floorPlane = scene.getMeshByName("Plane001_FLOOR_0");
+                if (floorPlane) {
+                    floorPlane.isVisible = false;
+                }
+                
+                scene.materials.forEach((material) => {
+                    if (material.getActiveTextures) {
+                        material.getActiveTextures().forEach((texture) => {
+                            texture.updateSamplingMode(BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+                            texture.anisotropicFilteringLevel = isMobile ? 8 : 16;
+                        });
+                    }
+                });
+                
+                scene.render();
+            });
+
+            //----BACKGROUND SETUP--------------------
+            function hexToColor3(hex) {
+                var r = parseInt(hex.slice(1, 3), 16) / 255;
+                var g = parseInt(hex.slice(3, 5), 16) / 255;
+                var b = parseInt(hex.slice(5, 7), 16) / 255;
+                return new BABYLON.Color3(r, g, b);
+            }
+
+            var bgColor = hexToColor3(backgroundColor);
+            scene.clearColor = new BABYLON.Color4(bgColor.r, bgColor.g, bgColor.b, 1.0).toLinearSpace();
+
+            var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
+            ground.rotation.x = Math.PI / 2;
+            ground.position.y = shadowOnlyGroundHeight;
+            ground.material = new BABYLON.ShadowOnlyMaterial('mat', scene);
+            ground.material.activeLight = lightShadowBlur;
+            ground.receiveShadows = true;
+            
+            pointLight1.excludedMeshes.push(ground);
+            pointLight2.excludedMeshes.push(ground);
+            pointLight3.excludedMeshes.push(ground);
+
+            var myMaterial = new BABYLON.StandardMaterial("myMaterial", scene);
+            myMaterial.emissiveColor = hexToColor3(backgroundColor);
+            groundPlane.material = myMaterial;
+
+            //----BAKED AO SHADOW PLANE---------------
+            var shadowPlane = BABYLON.MeshBuilder.CreatePlane('shadowPlane', {width: shadowSize, height: shadowSize}, scene);
+            shadowPlane.rotation.x = Math.PI / 2;
+            shadowPlane.position.y = blurredShadowPlaneHeight;
+            
+            pointLight1.excludedMeshes.push(shadowPlane);
+            pointLight2.excludedMeshes.push(shadowPlane);
+            pointLight3.excludedMeshes.push(shadowPlane);
+            
+            var shadowTexture = new BABYLON.DynamicTexture("shadowTexture", 2048, scene, true);
+            var ctx = shadowTexture.getContext();
+            
+            var size = 2048;
+            var centerX = size / 2;
+            var centerY = size / 2;
+            var squareSize = size * 0.4;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, ' + shadowDarkness + ')';
+            ctx.fillRect(
+                centerX - squareSize / 2,
+                centerY - squareSize / 2,
+                squareSize,
+                squareSize
+            );
+            
+            ctx.filter = 'blur(' + shadowBlurAmount + 'px)';
+            
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            var tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            ctx.clearRect(0, 0, size, size);
+            ctx.filter = 'blur(' + shadowBlurAmount + 'px)';
+            ctx.drawImage(tempCanvas, 0, 0);
+            
+            shadowTexture.update();
+            
+            var shadowMaterial = new BABYLON.StandardMaterial("shadowMat", scene);
+            shadowMaterial.diffuseTexture = shadowTexture;
+            shadowMaterial.diffuseTexture.hasAlpha = true;
+            shadowMaterial.useAlphaFromDiffuseTexture = true;
+            shadowMaterial.backFaceCulling = true;
+            shadowMaterial.disableLighting = true;
+            shadowMaterial.emissiveColor = new BABYLON.Color3(0, 0, 0);
+            shadowPlane.material = shadowMaterial;
+
+            return scene;
+        };
+        
+        const scene = createScene();
+        
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+        
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+        
+        canvas.addEventListener('wheel', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gesturechange', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('gestureend', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        canvas.addEventListener('touchmove', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
