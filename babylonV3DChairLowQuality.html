@@ -10,15 +10,37 @@
             height: 100%;
             margin: 0;
             padding: 0;
+            outline: none !important;
+            border: none !important;
         }
+        
+        * {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        *:focus {
+            outline: none !important;
+            border: none !important;
+        }
+        
         #renderCanvas {
             width: 100%;
             height: 100%;
             touch-action: none;
             cursor: grab;
+            outline: none !important;
+            border: none !important;
+            display: block;
         }
+        
         #renderCanvas:active {
             cursor: grabbing;
+        }
+        
+        #renderCanvas:focus {
+            outline: none !important;
+            border: none !important;
         }
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
