@@ -12,7 +12,6 @@
             padding: 0;
             outline: none !important;
             border: none !important;
-            -webkit-overflow-scrolling: touch;
         }
         
         * {
@@ -102,8 +101,13 @@
             }
             log('✅ Canvas element found');
             
-            log('🔵 Creating Babylon engine...');
-            const engine = new BABYLON.Engine(canvas, true);
+            log('🔵 Creating Babylon engine with low-power settings...');
+            const engine = new BABYLON.Engine(canvas, false, {
+                disableWebGL2Support: true,  // Force WebGL1
+                powerPreference: "low-power",  // Use less GPU
+                preserveDrawingBuffer: false,
+                stencil: false
+            });
             log('✅ Engine created successfully');
             log('🔧 WebGL Version: ' + engine.webGLVersion);
             
@@ -112,8 +116,9 @@
                 var scene = new BABYLON.Scene(engine);
                 log('✅ Scene created');
                 
-                engine.setHardwareScalingLevel(1);
-                log('✅ Hardware scaling set');
+                // Set lower hardware scaling for mobile
+                engine.setHardwareScalingLevel(2);
+                log('✅ Hardware scaling set to 2 (lower quality, less memory)');
                 
                 log('🔵 Creating camera...');
                 var cameraDistance = 5;
@@ -157,15 +162,7 @@
                     animate();
                 };
 
-                log('🔵 Loading HDR environment...');
-                try {
-                    var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("https://assets.babylonjs.com/environments/studio.env", scene);
-                    scene.environmentTexture = hdrTexture;
-                    scene.environmentIntensity = 1.2;
-                    log('✅ HDR environment loaded');
-                } catch(e) {
-                    log('❌ HDR load failed: ' + e.message, true);
-                }
+                // NO HDR - REMOVED COMPLETELY
 
                 log('🔵 Creating cube...');
                 try {
@@ -183,10 +180,12 @@
                     log('✅ Camera animation started');
                 } catch(e) {
                     log('❌ Cube creation failed: ' + e.message, true);
+                    throw e;
                 }
 
                 log('🔵 Setting up background...');
-                scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+                // Simple grey background instead of transparent
+                scene.clearColor = new BABYLON.Color4(0.85, 0.85, 0.85, 1);
                 
                 var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
                 ground.rotation.x = Math.PI / 2;
