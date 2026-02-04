@@ -44,136 +44,216 @@
             outline: none !important;
             border: none !important;
         }
+        
+        /* DEBUG OVERLAY - VISIBLE ON SCREEN */
+        #debug-log {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 99999;
+            border: 2px solid white;
+            border-radius: 5px;
+        }
+        
+        #debug-log.success {
+            background: rgba(0, 200, 0, 0.9);
+        }
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 </head>
 <body>
+    <div id="debug-log">🔵 Starting debug log...</div>
     <canvas id="renderCanvas"></canvas>
     <script>
-        const canvas = document.getElementById("renderCanvas");
-        const engine = new BABYLON.Engine(canvas, true);
+        const debugDiv = document.getElementById('debug-log');
         
-        var createScene = function () {
-            var scene = new BABYLON.Scene(engine);
+        function log(msg, isError = false) {
+            console.log(msg);
+            debugDiv.innerHTML += '<br>' + msg;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
             
-            // Disable hardware scaling for worse aliasing
-            engine.setHardwareScalingLevel(1);
-            
-        //----CAMERA SETUP-----------------------
-            
-            var cameraDistance = 5;
-            var cameraTargetHeight = 0.45;
-            var finalAlpha = -2;
-            var finalBeta = 1.38;
-            var startAlpha = finalAlpha + 1.2;
-            var startBeta = finalBeta - 0.4;
-            
-            var camera = new BABYLON.ArcRotateCamera("Camera", startAlpha, startBeta, cameraDistance, BABYLON.Vector3(0,0,0), scene);
-            camera.attachControl(canvas, true);
-            camera.wheelPrecision = 40;
-            camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
-            camera.panningSensibility = 0;
-            camera.pinchDeltaPercentage = 0.01;
-            camera.fov = .3;
-            camera.upperRadiusLimit = 7;
-            camera.lowerRadiusLimit = 1.7;
-            
-            // Animate camera rotation on load
-            var animateCameraIn = function() {
-                var animationDuration = 2000;
-                var startTime = performance.now();
-                
-                var animate = function() {
-                    var elapsed = performance.now() - startTime;
-                    var progress = Math.min(elapsed / animationDuration, 1);
-                    
-                    var eased = progress < 0.5 
-                        ? 2 * progress * progress 
-                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                    
-                    camera.alpha = startAlpha + (finalAlpha - startAlpha) * eased;
-                    camera.beta = startBeta + (finalBeta - startBeta) * eased;
-                    
-                    if (progress < 1) {
-                        requestAnimationFrame(animate);
-                    }
-                };
-                
-                animate();
-            };
-
-        //----HDRI TEXTURE------------------------
-
-            var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("https://assets.babylonjs.com/environments/studio.env", scene);
-            scene.environmentTexture = hdrTexture;
-            scene.environmentIntensity = 1.2;
-
-        //----SIMPLE CUBE INSTEAD OF CHAIR-------
-
-            // Create a simple cube
-            var box = BABYLON.MeshBuilder.CreateBox("box", {size: 1}, scene);
-            box.position.y = 0.5; // Lift it up so it sits on the "ground"
-            
-            // Give it a simple material
-            var boxMaterial = new BABYLON.StandardMaterial("boxMat", scene);
-            boxMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.6, 0.4); // Tan color
-            boxMaterial.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-            box.material = boxMaterial;
-            
-            // Start camera animation
-            animateCameraIn();
-            
-            console.log("Cube created successfully");
-
-        //----BACKGROUND SETUP--------------------
-
-            // Transparent background
-            scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
-
-            // Invisible ground (no shadow reception)
-            var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
-            ground.rotation.x = Math.PI / 2;
-            ground.isVisible = false;
-
-            return scene;
-
-        };
-        
-        const scene = createScene();
-        
-        engine.runRenderLoop(function () {
-            scene.render();
-        });
-        
-        window.addEventListener("resize", function () {
-            engine.resize();
-        });
-        
-        // Prevent page scroll when mouse wheel over canvas
-        canvas.addEventListener('wheel', function(e) {
-            e.preventDefault();
-        }, { passive: false });
-        
-        // Prevent page zoom/scroll when pinch-to-zoom on trackpad
-        canvas.addEventListener('gesturestart', function(e) {
-            e.preventDefault();
-        }, { passive: false });
-        
-        canvas.addEventListener('gesturechange', function(e) {
-            e.preventDefault();
-        }, { passive: false });
-        
-        canvas.addEventListener('gestureend', function(e) {
-            e.preventDefault();
-        }, { passive: false });
-        
-        // Prevent touchpad pinch zoom
-        canvas.addEventListener('touchmove', function(e) {
-            if (e.touches.length > 1) {
-                e.preventDefault();
+            if (isError) {
+                debugDiv.style.background = 'rgba(255, 0, 0, 0.9)';
             }
-        }, { passive: false });
+        }
+        
+        function success() {
+            debugDiv.classList.add('success');
+        }
+        
+        try {
+            log('✅ Script started');
+            log('📱 User Agent: ' + navigator.userAgent.substring(0, 50) + '...');
+            log('📐 Screen: ' + window.innerWidth + 'x' + window.innerHeight);
+            log('🖥️ Device Pixel Ratio: ' + window.devicePixelRatio);
+            
+            const canvas = document.getElementById("renderCanvas");
+            if (!canvas) {
+                log('❌ FATAL: Canvas not found!', true);
+                throw new Error('Canvas not found');
+            }
+            log('✅ Canvas element found');
+            
+            log('🔵 Creating Babylon engine...');
+            const engine = new BABYLON.Engine(canvas, true);
+            log('✅ Engine created successfully');
+            log('🔧 WebGL Version: ' + engine.webGLVersion);
+            
+            var createScene = function () {
+                log('🔵 Creating scene...');
+                var scene = new BABYLON.Scene(engine);
+                log('✅ Scene created');
+                
+                engine.setHardwareScalingLevel(1);
+                log('✅ Hardware scaling set');
+                
+                log('🔵 Creating camera...');
+                var cameraDistance = 5;
+                var cameraTargetHeight = 0.45;
+                var finalAlpha = -2;
+                var finalBeta = 1.38;
+                var startAlpha = finalAlpha + 1.2;
+                var startBeta = finalBeta - 0.4;
+                
+                var camera = new BABYLON.ArcRotateCamera("Camera", startAlpha, startBeta, cameraDistance, BABYLON.Vector3(0,0,0), scene);
+                camera.attachControl(canvas, true);
+                camera.wheelPrecision = 40;
+                camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
+                camera.panningSensibility = 0;
+                camera.pinchDeltaPercentage = 0.01;
+                camera.fov = .3;
+                camera.upperRadiusLimit = 7;
+                camera.lowerRadiusLimit = 1.7;
+                log('✅ Camera created and attached');
+                
+                var animateCameraIn = function() {
+                    var animationDuration = 2000;
+                    var startTime = performance.now();
+                    
+                    var animate = function() {
+                        var elapsed = performance.now() - startTime;
+                        var progress = Math.min(elapsed / animationDuration, 1);
+                        
+                        var eased = progress < 0.5 
+                            ? 2 * progress * progress 
+                            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                        
+                        camera.alpha = startAlpha + (finalAlpha - startAlpha) * eased;
+                        camera.beta = startBeta + (finalBeta - startBeta) * eased;
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        }
+                    };
+                    
+                    animate();
+                };
+
+                log('🔵 Loading HDR environment...');
+                try {
+                    var hdrTexture = BABYLON.CubeTexture.CreateFromPrefilteredData("https://assets.babylonjs.com/environments/studio.env", scene);
+                    scene.environmentTexture = hdrTexture;
+                    scene.environmentIntensity = 1.2;
+                    log('✅ HDR environment loaded');
+                } catch(e) {
+                    log('❌ HDR load failed: ' + e.message, true);
+                }
+
+                log('🔵 Creating cube...');
+                try {
+                    var box = BABYLON.MeshBuilder.CreateBox("box", {size: 1}, scene);
+                    box.position.y = 0.5;
+                    log('✅ Cube geometry created');
+                    
+                    var boxMaterial = new BABYLON.StandardMaterial("boxMat", scene);
+                    boxMaterial.diffuseColor = new BABYLON.Color3(0.8, 0.6, 0.4);
+                    boxMaterial.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+                    box.material = boxMaterial;
+                    log('✅ Cube material applied');
+                    
+                    animateCameraIn();
+                    log('✅ Camera animation started');
+                } catch(e) {
+                    log('❌ Cube creation failed: ' + e.message, true);
+                }
+
+                log('🔵 Setting up background...');
+                scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+                
+                var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
+                ground.rotation.x = Math.PI / 2;
+                ground.isVisible = false;
+                log('✅ Background setup complete');
+
+                log('✅✅✅ SCENE CREATION COMPLETE ✅✅✅');
+                return scene;
+            };
+            
+            const scene = createScene();
+            
+            log('🔵 Starting render loop...');
+            let frameCount = 0;
+            engine.runRenderLoop(function () {
+                scene.render();
+                frameCount++;
+                
+                if (frameCount === 1) {
+                    log('✅ First frame rendered!');
+                }
+                if (frameCount === 60) {
+                    log('✅ 60 frames rendered (1 sec @ 60fps)');
+                    success();
+                    // Hide debug log after 3 seconds if successful
+                    setTimeout(() => {
+                        debugDiv.style.display = 'none';
+                    }, 3000);
+                }
+            });
+            
+            log('✅ Render loop started');
+            
+            window.addEventListener("resize", function () {
+                engine.resize();
+                log('📐 Resized');
+            });
+            
+            canvas.addEventListener('wheel', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('gesturestart', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('gesturechange', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('gestureend', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('touchmove', function(e) {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            log('✅✅✅ ALL SETUP COMPLETE ✅✅✅');
+            
+        } catch(error) {
+            log('❌❌❌ FATAL ERROR: ' + error.message, true);
+            log('Stack: ' + error.stack, true);
+        }
     </script>
 </body>
 </html>
