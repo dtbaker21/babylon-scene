@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Chair Viewer</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            outline: none !important;
+            border: none !important;
+        }
+        
+        * {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        *:focus {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+            outline: none !important;
+            border: none !important;
+            display: block;
+        }
+        
+        #renderCanvas:active {
+            cursor: grabbing;
+        }
+        
+        #renderCanvas:focus {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        /* DEBUG OVERLAY - VISIBLE ON SCREEN */
+        #debug-log {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 99999;
+            border: 2px solid white;
+            border-radius: 5px;
+        }
+        
+        #debug-log.success {
+            background: rgba(0, 200, 0, 0.9);
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+    <div id="debug-log">🔵 Starting debug log...</div>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        const debugDiv = document.getElementById('debug-log');
+        
+        function log(msg, isError = false) {
+            console.log(msg);
+            debugDiv.innerHTML += '<br>' + msg;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            
+            if (isError) {
+                debugDiv.style.background = 'rgba(255, 0, 0, 0.9)';
+            }
+        }
+        
+        function success() {
+            debugDiv.classList.add('success');
+        }
+        
+        try {
+            log('✅ Script started');
+            log('📱 User Agent: ' + navigator.userAgent.substring(0, 50) + '...');
+            log('📐 Screen: ' + window.innerWidth + 'x' + window.innerHeight);
+            log('🖥️ Device Pixel Ratio: ' + window.devicePixelRatio);
+            
+            const canvas = document.getElementById("renderCanvas");
+            if (!canvas) {
+                log('❌ FATAL: Canvas not found!', true);
+                throw new Error('Canvas not found');
+            }
+            log('✅ Canvas element found');
+            
+            log('🔵 Creating Babylon engine with low-power settings...');
+            const engine = new BABYLON.Engine(canvas, false, {
+                disableWebGL2Support: true,  // Force WebGL1
+                powerPreference: "low-power",  // Use less GPU
+                preserveDrawingBuffer: false,
+                stencil: false
+            });
+            log('✅ Engine created successfully');
+            log('🔧 WebGL Version: ' + engine.webGLVersion);
+            
+            var createScene = function () {
+                log('🔵 Creating scene...');
+                var scene = new BABYLON.Scene(engine);
+                log('✅ Scene created');
+                
+                // Set lower hardware scaling for mobile
+                engine.setHardwareScalingLevel(2);
+                log('✅ Hardware scaling set to 2 (lower quality, less memory)');
+                
+                log('🔵 Creating camera...');
+                var cameraDistance = 5;
+                var cameraTargetHeight = 0.45;
+                var finalAlpha = -2;
+                var finalBeta = 1.38;
+                var startAlpha = finalAlpha + 1.2;
+                var startBeta = finalBeta - 0.4;
+                
+                var camera = new BABYLON.ArcRotateCamera("Camera", startAlpha, startBeta, cameraDistance, BABYLON.Vector3(0,0,0), scene);
+                camera.attachControl(canvas, true);
+                camera.wheelPrecision = 40;
+                camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
+                camera.panningSensibility = 0;
+                camera.pinchDeltaPercentage = 0.01;
+                camera.fov = .3;
+                camera.upperRadiusLimit = 7;
+                camera.lowerRadiusLimit = 1.7;
+                log('✅ Camera created and attached');
+                
+                var animateCameraIn = function() {
+                    var animationDuration = 2000;
+                    var startTime = performance.now();
+                    
+                    var animate = function() {
+                        var elapsed = performance.now() - startTime;
+                        var progress = Math.min(elapsed / animationDuration, 1);
+                        
+                        var eased = progress < 0.5 
+                            ? 2 * progress * progress 
+                            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                        
+                        camera.alpha = startAlpha + (finalAlpha - startAlpha) * eased;
+                        camera.beta = startBeta + (finalBeta - startBeta) * eased;
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        }
+                    };
+                    
+                    animate();
+                };
+
+                // NO HDR - REMOVED COMPLETELY
+
+                log('🔵 Loading chair model from Dropbox...');
+                var modelScale = 0.01;
+
+                BABYLON.SceneLoader.ImportMesh(
+                    "", 
+                    "https://dl.dropbox.com/scl/fi/5mpforjje4go75nufbtqn/NEW-BAD-CHAIR-2.glb?rlkey=he8ic20k54ajoqq1isenbxpgi&st=m2nwrmbs", 
+                    "", 
+                    scene, 
+                    function (meshes) {
+                        log('✅ Chair model loaded successfully');
+                        
+                        const meshConstant = scene.getMeshByName("__root__");
+                        
+                        if (!meshConstant) {
+                            log('❌ Could not find __root__ mesh', true);
+                            log('Available meshes: ' + scene.meshes.map(m => m.name).join(', '));
+                            return;
+                        }
+                        
+                        meshConstant.scaling = new BABYLON.Vector3(modelScale, modelScale, modelScale);
+                        log('✅ Chair scaled');
+                        
+                        const floorPlane = scene.getMeshByName("Plane001_FLOOR_0");
+                        if (floorPlane) {
+                            floorPlane.isVisible = false;
+                            log('✅ Floor plane hidden');
+                        }
+                        
+                        // Degrade texture quality - disable filtering and reduce sampling
+                        scene.materials.forEach((material) => {
+                            if (material.getActiveTextures) {
+                                material.getActiveTextures().forEach((texture) => {
+                                    texture.updateSamplingMode(BABYLON.Texture.NEAREST_SAMPLINGMODE);
+                                    texture.anisotropicFilteringLevel = 1;
+                                });
+                            }
+                        });
+                        log('✅ Textures degraded for performance');
+                        
+                        animateCameraIn();
+                        log('✅ Camera animation started');
+                    },
+                    function (progress) {
+                        if (progress.lengthComputable) {
+                            const percent = (progress.loaded / progress.total * 100).toFixed(0);
+                            log('📦 Loading chair: ' + percent + '%');
+                        }
+                    },
+                    function (scene, message, exception) {
+                        log('❌ Chair load FAILED: ' + message, true);
+                        if (exception) {
+                            log('Exception: ' + exception, true);
+                        }
+                    }
+                );
+
+                log('🔵 Setting up background...');
+                // Simple grey background instead of transparent
+                scene.clearColor = new BABYLON.Color4(0.85, 0.85, 0.85, 1);
+                
+                var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
+                ground.rotation.x = Math.PI / 2;
+                ground.isVisible = false;
+                log('✅ Background setup complete');
+
+                log('✅✅✅ SCENE CREATION COMPLETE ✅✅✅');
+                return scene;
+            };
+            
+            const scene = createScene();
+            
+            log('🔵 Starting render loop...');
+            let frameCount = 0;
+            engine.runRenderLoop(function () {
+                scene.render();
+                frameCount++;
+                
+                if (frameCount === 1) {
+                    log('✅ First frame rendered!');
+                }
+                if (frameCount === 60) {
+                    log('✅ 60 frames rendered (1 sec @ 60fps)');
+                    success();
+                    // Hide debug log after 5 seconds if successful
+                    setTimeout(() => {
+                        debugDiv.style.display = 'none';
+                    }, 5000);
+                }
+            });
+            
+            log('✅ Render loop started');
+            
+            window.addEventListener("resize", function () {
+                engine.resize();
+                log('📐 Resized');
+            });
+            
+            canvas.addEventListener('wheel', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('gesturestart', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('gesturechange', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('gestureend', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            canvas.addEventListener('touchmove', function(e) {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            log('✅✅✅ ALL SETUP COMPLETE ✅✅✅');
+            
+        } catch(error) {
+            log('❌❌❌ FATAL ERROR: ' + error.message, true);
+            log('Stack: ' + error.stack, true);
+        }
+    </script>
+</body>
+</html>
