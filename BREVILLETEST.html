@@ -61,6 +61,9 @@
             disableWebGL2Support: false,
             powerPreference: "high-performance"
         });
+
+        // Option 2: Cap the max scaling (prevents going too high on retina displays)
+engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio, 2));
         
         var createScene = function () {
             var scene = new BABYLON.Scene(engine);
