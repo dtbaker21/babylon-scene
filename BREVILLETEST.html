@@ -114,10 +114,12 @@
             camera.lowerRadiusLimit = 1.7;
 
 
-            // ADD THESE LINES FOR SNAPPIER MOTION:
-camera.inertia = 0.5; // Default is 0.9, lower = snappier (range: 0-1)
-camera.angularSensibilityX = 1000; // Lower = more sensitive rotation
-camera.angularSensibilityY = 1000; // Lower = more sensitive rotation
+// Change these values:
+camera.inertia = 0.7; // Back up from 0.5 to keep momentum
+camera.speed = 2; // Increase speed for more responsive feel (default is 1)
+
+// You can also try:
+camera.useAutoRotationBehavior = false; // Make sure this isn't interfering
 
         //----SHADOW VARIABLES--------------------
 
