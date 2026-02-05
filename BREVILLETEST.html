@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chair Viewer</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            outline: none !important;
+            border: none !important;
+            /* FIXED: Prevent iOS Safari bounce */
+            position: fixed;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        * {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        *:focus {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            /* FIXED: Let Babylon handle touch */
+            touch-action: none;
+            cursor: grab;
+            outline: none !important;
+            border: none !important;
+            display: block;
+        }
+        
+        #renderCanvas:active {
+            cursor: grabbing;
+        }
+        
+        #renderCanvas:focus {
+            outline: none !important;
+            border: none !important;
+        }
+        
+        /* NEW: Debug overlay */
+        #debug-overlay {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 9999;
+            max-width: 300px;
+            display: none; /* Set to block to see debug info */
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+</head>
+<body>
+    <!-- NEW: Debug overlay (hidden by default) -->
+    <div id="debug-overlay"></div>
+    
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        // Debug logger
+        const debugLog = (msg) => {
+            console.log(msg);
+            const overlay = document.getElementById('debug-overlay');
+            if (overlay && overlay.style.display === 'block') {
+                overlay.innerHTML += msg + '<br>';
+            }
+        };
+        
+        debugLog('🔵 Script started');
+        debugLog('Device: ' + navigator.userAgent);
+        debugLog('Screen: ' + window.innerWidth + 'x' + window.innerHeight);
+        
+        const canvas = document.getElementById("renderCanvas");
+        
+        // FIXED: Better engine initialization for mobile
+        const engine = new BABYLON.Engine(canvas, true, {
+            preserveDrawingBuffer: true,
+            stencil: true,
+            disableWebGL2Support: false,
+            powerPreference: "high-performance"
+        });
+        
+        debugLog('✅ Engine created');
+        
+        var createScene = function () {
+            debugLog('🔵 Creating scene...');
+            var scene = new BABYLON.Scene(engine);
+            
+            // FIXED: Reduce hardware scaling on mobile for better performance
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+                engine.setHardwareScalingLevel(1 / window.devicePixelRatio);
+                debugLog('📱 Mobile detected - adjusted scaling');
+            } else {
+                engine.setHardwareScalingLevel(1);
+            }
+
+            //----LIGHT ORBS VISIBILITY---------------
+            var showLightOrbs = false;
+
+            //----BACKGROUND COLOR--------------------
+            var backgroundColor = "#E8E7E7";
+
+            //----EXR ROTATION------------------------
+            var exrRotationDegrees = 180;
+
+            //----MODEL POSITION----------------------
+            var modelVerticalOffset = 0;
+
+            //----GROUND PLANE HEIGHTS----------------
+            var emissiveGroundHeight = 0;
+            var shadowOnlyGroundHeight = 0.001;
+            var blurredShadowPlaneHeight = 0.002;
+
+            //----POINT LIGHTS SETUP------------------
+            var pointLight1Intensity = 5;
+            var pointLight2Intensity = 5;
+            var pointLight3Intensity = 0;
+
+            //----CAMERA SETUP-----------------------
+            var cameraDistance = 2.5;
+            var cameraTargetHeight = 0.15;
+            
+            var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, cameraDistance, new BABYLON.Vector3(0,0,0), scene);
+            camera.attachControl(canvas, true);
+            camera.wheelPrecision = 40;
+            camera.setTarget(new BABYLON.Vector3(0, cameraTargetHeight, 0));
+            camera.panningSensibility = 0;
+            camera.pinchDeltaPercentage = 0.001;
+            camera.fov = .3;
+            camera.beta = 1.33;
+            camera.alpha = -2;
+            camera.upperRadiusLimit = 30;
+            camera.lowerRadiusLimit = 1.7;
+            
+            // FIXED: Ensure camera inputs are properly attached for mobile
+            camera.inputs.attached.pointers.buttons = [0, 1, 2];
+            
+            debugLog('✅ Camera created');
+
+            //----SHADOW VARIABLES--------------------
+            var shadowWidth = 0.9;
+            var shadowHeight = 1;
+            var shadowDarkness = 0;
+            var shadowBlurAmount = 30;
+
+            //----HDRI TEXTURE (EXR)------------------
+            debugLog('🔵 Loading EXR environment...');
+            
+            const hdrTexture = new BABYLON.EXRCubeTexture(
+                "https://dl.dropbox.com/scl/fi/nsreuijac4dxclti13q5g/brown_photostudio_02_512.exr?rlkey=8x05nmzqyexnjro5hs0r7dyqr&st=evqale1r",
+                scene,
+                512,
+                false,
+                true,
+                false,
+                true
+            );
+            
+            hdrTexture.rotationY = exrRotationDegrees * (Math.PI / 180);
+            scene.environmentTexture = hdrTexture;
+            scene.environmentIntensity = 0.6;
+            
+            debugLog('✅ EXR environment loaded');
+
+            //----GROUND PLANE------------------------
+            const groundPlane = BABYLON.MeshBuilder.CreateGround("ground", {height: 100, width: 100, subdivisions: 4});
+            groundPlane.position.y = emissiveGroundHeight;
+
+            //----POINT LIGHTS------------------------
+            var pointLight1 = new BABYLON.PointLight("pointLight1", new BABYLON.Vector3(-2, 0, 1), scene);
+            pointLight1.intensity = pointLight1Intensity;
+            pointLight1.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight1.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight1.excludedMeshes.push(groundPlane);
+            
+            var sphere1 = BABYLON.MeshBuilder.CreateSphere("sphere1", {diameter: 0.2}, scene);
+            sphere1.position = pointLight1.position;
+            sphere1.isVisible = showLightOrbs;
+            var sphere1Mat = new BABYLON.StandardMaterial("sphere1Mat", scene);
+            sphere1Mat.emissiveColor = new BABYLON.Color3(1, 1, 0);
+            sphere1Mat.disableLighting = true;
+            sphere1.material = sphere1Mat;
+            
+            var pointLight2 = new BABYLON.PointLight("pointLight2", new BABYLON.Vector3(1.5, 0.8, -1), scene);
+            pointLight2.intensity = pointLight2Intensity;
+            pointLight2.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight2.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight2.excludedMeshes.push(groundPlane);
+            
+            var sphere2 = BABYLON.MeshBuilder.CreateSphere("sphere2", {diameter: 0.2}, scene);
+            sphere2.position = pointLight2.position;
+            sphere2.isVisible = showLightOrbs;
+            var sphere2Mat = new BABYLON.StandardMaterial("sphere2Mat", scene);
+            sphere2Mat.emissiveColor = new BABYLON.Color3(0, 1, 1);
+            sphere2Mat.disableLighting = true;
+            sphere2.material = sphere2Mat;
+            
+            var pointLight3 = new BABYLON.PointLight("pointLight3", new BABYLON.Vector3(0, 0, 4), scene);
+            pointLight3.intensity = pointLight3Intensity;
+            pointLight3.diffuse = new BABYLON.Color3(1, 1, 1);
+            pointLight3.specular = new BABYLON.Color3(1, 1, 1);
+            pointLight3.excludedMeshes.push(groundPlane);
+            
+            var sphere3 = BABYLON.MeshBuilder.CreateSphere("sphere3", {diameter: 0.2}, scene);
+            sphere3.position = pointLight3.position;
+            sphere3.isVisible = showLightOrbs;
+            var sphere3Mat = new BABYLON.StandardMaterial("sphere3Mat", scene);
+            sphere3Mat.emissiveColor = new BABYLON.Color3(1, 0, 1);
+            sphere3Mat.disableLighting = true;
+            sphere3.material = sphere3Mat;
+
+            //----ANTI-ALIASING PIPELINE--------------
+            // FIXED: Reduce quality on mobile
+            var pipeline = new BABYLON.DefaultRenderingPipeline(
+                "defaultPipeline",
+                true,
+                scene,
+                [camera]
+            );
+            pipeline.fxaaEnabled = true;
+            pipeline.samples = isMobile ? 2 : 4;
+            
+            debugLog('✅ Pipeline created (samples: ' + pipeline.samples + ')');
+
+            //----SHADOW LIGHT------------------------
+            var lightShadowBlur = new BABYLON.SpotLight("spot00", new BABYLON.Vector3(0, 20, 0), new BABYLON.Vector3(0, -1, 0), 1.2, 24, scene);
+            lightShadowBlur.shadowMinZ = 0;
+            lightShadowBlur.shadowMaxZ = 20;
+            lightShadowBlur.excludedMeshes.push(groundPlane);
+            
+            // FIXED: Lower shadow quality on mobile
+            var contactShadowGenerator = new BABYLON.ShadowGenerator(isMobile ? 128 : 256, lightShadowBlur);
+            contactShadowGenerator.useContactHardeningShadow = true;
+            contactShadowGenerator.contactHardeningLightSizeUVRatio = 0.05;
+            contactShadowGenerator.setDarkness(0.7);
+            
+            debugLog('✅ Shadows created');
+
+            //----SSAO2-------------------------------
+            // FIXED: Lower SSAO quality on mobile
+            const SSAO2 = new BABYLON.SSAO2RenderingPipeline("ssao2", scene, 1, [camera]);
+            SSAO2.samples = isMobile ? 16 : 32;
+            SSAO2.minZAspect = 0.05;
+            SSAO2.radius = 0.2;
+            SSAO2.totalStrength = 3;
+            
+            debugLog('✅ SSAO2 created (samples: ' + SSAO2.samples + ')');
+
+            //----SSR----------------------------------
+            const ssr = new BABYLON.SSRRenderingPipeline(
+                "ssr",
+                scene,
+                [camera],
+                false,
+                BABYLON.Constants.TEXTURETYPE_UNSIGNED_BYTE
+            );
+
+            ssr.environmentTexture = hdrTexture;
+            ssr.strength = 1;
+            ssr.reflectionSpecularFalloffExponent = 5;
+            ssr.enableAutomaticThicknessComputation = true;
+            ssr.thickness = 0;
+            ssr.step = 3;
+            ssr.blurDispersionStrength = 0.2;
+            ssr.roughnessFactor = 0.2;
+            
+            debugLog('✅ SSR created');
+
+            //----CHAIR--------------------------------
+            debugLog('🔵 Loading model...');
+
+            var modelScale = 1;
+
+            var couch = BABYLON.SceneLoader.ImportMesh("", "https://dl.dropbox.com/scl/fi/b1v5zu1ythfc9l5qff1jn/ASSET.glb?rlkey=ixjr7okieacixilw14v89mb6e&st=or4xvuo5", "my-file.glb", scene, function (mesh) {
+                debugLog('✅ MODEL LOADED');
+                
+                const meshConstant = scene.getMeshByName("__root__");
+                
+                if (!meshConstant) {
+                    debugLog('❌ ERROR: Could not find __root__ mesh');
+                    return;
+                }
+                
+                meshConstant.scaling = new BABYLON.Vector3(-modelScale, modelScale, modelScale);
+                meshConstant.position.y = modelVerticalOffset;
+                meshConstant.receiveShadows = true;
+                
+                if (mesh[1]) {
+                    contactShadowGenerator.addShadowCaster(mesh[1], true);
+                }
+                
+                const floorPlane = scene.getMeshByName("Plane001_FLOOR_0");
+                if (floorPlane) {
+                    floorPlane.isVisible = false;
+                }
+                
+                scene.materials.forEach((material) => {
+                    if (material.getActiveTextures) {
+                        material.getActiveTextures().forEach((texture) => {
+                            texture.updateSamplingMode(BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+                            texture.anisotropicFilteringLevel = isMobile ? 8 : 16;
+                        });
+                    }
+                });
+                
+                // ENABLE SSR ON MODEL MATERIALS
+                scene.materials.forEach((material) => {
+                    if (material instanceof BABYLON.PBRMaterial) {
+                        if (!material.reflectivityTexture) {
+                            material.reflectivityTexture = new BABYLON.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", scene);
+                        }
+                    }
+                    else if (material instanceof BABYLON.StandardMaterial) {
+                        if (!material.specularTexture) {
+                            material.specularTexture = new BABYLON.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", scene);
+                        }
+                    }
+                });
+                
+                debugLog('✅ Model setup complete with SSR enabled');
+                
+                // FIXED: Force a render after model loads
+                scene.render();
+            },
+            function (progress) {
+                if (progress.lengthComputable) {
+                    const percent = (progress.loaded / progress.total * 100).toFixed(0);
+                    debugLog('📦 Loading: ' + percent + '%');
+                }
+            },
+            function (scene, message, exception) {
+                debugLog('❌ Model load error: ' + message);
+                console.error('Model load error:', message, exception);
+            });
+
+            //----BACKGROUND SETUP--------------------
+            function hexToColor3(hex) {
+                var r = parseInt(hex.slice(1, 3), 16) / 255;
+                var g = parseInt(hex.slice(3, 5), 16) / 255;
+                var b = parseInt(hex.slice(5, 7), 16) / 255;
+                return new BABYLON.Color3(r, g, b);
+            }
+
+            var bgColor = hexToColor3(backgroundColor);
+            scene.clearColor = new BABYLON.Color4(bgColor.r, bgColor.g, bgColor.b, 1.0).toLinearSpace();
+
+            var ground = BABYLON.Mesh.CreatePlane('ground', 1000, scene);
+            ground.rotation.x = Math.PI / 2;
+            ground.position.y = shadowOnlyGroundHeight;
+            ground.material = new BABYLON.ShadowOnlyMaterial('mat', scene);
+            ground.material.activeLight = lightShadowBlur;
+            ground.receiveShadows = true;
+            
+            pointLight1.excludedMeshes.push(ground);
+            pointLight2.excludedMeshes.push(ground);
+            pointLight3.excludedMeshes.push(ground);
+
+            var myMaterial = new BABYLON.StandardMaterial("myMaterial", scene);
+            myMaterial.emissiveColor = hexToColor3(backgroundColor);
+            myMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+            groundPlane.material = myMaterial;
+
+            //----BAKED AO SHADOW PLANE---------------
+            var shadowPlane = BABYLON.MeshBuilder.CreatePlane('shadowPlane', {width: shadowWidth, height: shadowHeight}, scene);
+            shadowPlane.rotation.x = Math.PI / 2;
+            shadowPlane.position.y = blurredShadowPlaneHeight;
+            
+            pointLight1.excludedMeshes.push(shadowPlane);
+            pointLight2.excludedMeshes.push(shadowPlane);
+            pointLight3.excludedMeshes.push(shadowPlane);
+            
+            var shadowTexture = new BABYLON.DynamicTexture("shadowTexture", 2048, scene, true);
+            var ctx = shadowTexture.getContext();
+            
+            var size = 2048;
+            var centerX = size / 2;
+            var centerY = size / 2;
+            
+            var aspectRatio = shadowWidth / shadowHeight;
+            var squareWidth, squareHeight;
+            
+            if (aspectRatio >= 1) {
+                squareWidth = size * 0.4;
+                squareHeight = squareWidth / aspectRatio;
+            } else {
+                squareHeight = size * 0.4;
+                squareWidth = squareHeight * aspectRatio;
+            }
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, ' + shadowDarkness + ')';
+            ctx.fillRect(
+                centerX - squareWidth / 2,
+                centerY - squareHeight / 2,
+                squareWidth,
+                squareHeight
+            );
+            
+            ctx.filter = 'blur(' + shadowBlurAmount + 'px)';
+            
+            var tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            var tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            ctx.clearRect(0, 0, size, size);
+            ctx.filter = 'blur(' + shadowBlurAmount + 'px)';
+            ctx.drawImage(tempCanvas, 0, 0);
+            
+            shadowTexture.update();
+            
+            var shadowMaterial = new BABYLON.StandardMaterial("shadowMat", scene);
+            shadowMaterial.diffuseTexture = shadowTexture;
+            shadowMaterial.diffuseTexture.hasAlpha = true;
+            shadowMaterial.useAlphaFromDiffuseTexture = true;
+            shadowMaterial.backFaceCulling = true;
+            shadowMaterial.disableLighting = true;
+            shadowMaterial.emissiveColor = new BABYLON.Color3(0, 0, 0);
+            shadowMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+            shadowPlane.material = shadowMaterial;
+
+            debugLog('✅ Scene created successfully');
+            return scene;
+        };
+        
+        const scene = createScene();
+        
+        debugLog('🔵 Starting render loop...');
+        
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+        
+        debugLog('✅ Render loop started');
+        
+        window.addEventListener("resize", function () {
+            engine.resize();
+            debugLog('📐 Resized to: ' + window.innerWidth + 'x' + window.innerHeight);
+        });
+        
+        debugLog('✅ Setup complete - viewer should be interactive');
+    </script>
+</body>
+</html>
