@@ -61,6 +61,9 @@
             disableWebGL2Support: false,
             powerPreference: "high-performance"
         });
+
+        // ADD THIS HERE, before createScene:
+engine.setHardwareScalingLevel(1 / window.devicePixelRatio);
         
         var createScene = function () {
             var scene = new BABYLON.Scene(engine);
@@ -111,13 +114,6 @@
             camera.upperRadiusLimit = 30;
             camera.lowerRadiusLimit = 1.7;
 
-
-// Change these values:
-camera.inertia = 0.7; // Back up from 0.5 to keep momentum
-camera.speed = 2; // Increase speed for more responsive feel (default is 1)
-
-// You can also try:
-camera.useAutoRotationBehavior = false; // Make sure this isn't interfering
 
         //----SHADOW VARIABLES--------------------
 
