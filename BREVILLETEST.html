@@ -61,9 +61,6 @@
             disableWebGL2Support: false,
             powerPreference: "high-performance"
         });
-
-        // ADD THIS HERE, before createScene:
-engine.setHardwareScalingLevel(1 / window.devicePixelRatio);
         
         var createScene = function () {
             var scene = new BABYLON.Scene(engine);
