@@ -62,9 +62,12 @@
             powerPreference: "high-performance"
         });
         
+        // Debug WebGL version
+        console.log('WebGL Version:', engine.webGLVersion);
+        console.log('Capabilities:', engine.getCaps());
+        
         var createScene = function () {
             var scene = new BABYLON.Scene(engine);
-        
 
         //----LIGHT ORBS VISIBILITY---------------
 
@@ -110,7 +113,10 @@
             camera.alpha = -2;
             camera.upperRadiusLimit = 30;
             camera.lowerRadiusLimit = 1.7;
-
+            
+            // Snappier camera response
+            camera.inertia = 0.7;
+            camera.speed = 2;
 
         //----SHADOW VARIABLES--------------------
 
@@ -228,6 +234,13 @@
             SSAO2.minZAspect = 0.05;
             SSAO2.radius = 0.2;
             SSAO2.totalStrength = 3;
+            SSAO2.base = 0.1;
+            SSAO2.maxZ = 100;
+            
+            // Force attachment to camera
+            scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao2", camera);
+            
+            console.log("✅ SSAO2 created and attached");
 
 
         //----SSR----------------------------------
@@ -248,6 +261,8 @@
             ssr.step = 3;
             ssr.blurDispersionStrength = 0.2;
             ssr.roughnessFactor = 0.2;
+            ssr.samples = 1;
+            ssr.maxDistance = 100;
 
         //----CHAIR--------------------------------
 
