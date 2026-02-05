@@ -113,6 +113,12 @@
             camera.upperRadiusLimit = 30;
             camera.lowerRadiusLimit = 1.7;
 
+
+            // ADD THESE LINES FOR SNAPPIER MOTION:
+camera.inertia = 0.5; // Default is 0.9, lower = snappier (range: 0-1)
+camera.angularSensibilityX = 1000; // Lower = more sensitive rotation
+camera.angularSensibilityY = 1000; // Lower = more sensitive rotation
+
         //----SHADOW VARIABLES--------------------
 
             var shadowWidth = 0.9; // Width of shadow plane (adjust to make shadow wider/narrower)
